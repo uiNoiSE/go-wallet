@@ -3,14 +3,14 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/google/uuid"
 )
 
 var (
-	ErrInsufficientFunds = errors.New("insufficient funds")
-	ErrInvalidOperation  = errors.New("invalid operation type")
+	ErrInsufficientFunds    = errors.New("insufficient funds")
+	ErrAmountMustBePositive = errors.New("amount must be greater than zero")
+	ErrInvalidOperation     = errors.New("invalid operation type")
 )
 
 type WalletRepository interface {
@@ -31,8 +31,7 @@ func NewWalletService(repo WalletRepository) *WalletService {
 
 func (s *WalletService) ProcessTransaction(ctx context.Context, id uuid.UUID, opType string, amount float64) error {
 	if amount <= 0 {
-		err := fmt.Errorf("Сумма транзакции должна быть больше нуля")
-		return err
+		return ErrAmountMustBePositive
 	}
 
 	currentBalance, err := s.repo.GetWalletBalance(ctx, id)
@@ -59,4 +58,12 @@ func (s *WalletService) ProcessTransaction(ctx context.Context, id uuid.UUID, op
 	}
 
 	return nil
+}
+
+func (s *WalletService) CreateWallet(ctx context.Context) (uuid.UUID, error) {
+	return s.repo.CreateWallet(ctx)
+}
+
+func (s *WalletService) GetWalletBalance(ctx context.Context, id uuid.UUID) (float64, error) {
+	return s.repo.GetWalletBalance(ctx, id)
 }

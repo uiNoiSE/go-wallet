@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"go-wallet/internal/domain"
 	"testing"
 
 	"github.com/google/uuid"
@@ -69,7 +70,7 @@ func TestProcessTransaction(t *testing.T) {
 			opType:       "DEPOSIT",
 			amount:       -10.0,
 			wantNewFunds: 100.0,
-			wantErr:      ErrAmountMustBePositive,
+			wantErr:      domain.ErrAmountMustBePositive,
 		},
 
 		{
@@ -78,7 +79,7 @@ func TestProcessTransaction(t *testing.T) {
 			opType:       "WITHDRAW",
 			amount:       100.0,
 			wantNewFunds: 50.0,
-			wantErr:      ErrInsufficientFunds,
+			wantErr:      domain.ErrInsufficientFunds,
 		},
 
 		{
@@ -87,7 +88,7 @@ func TestProcessTransaction(t *testing.T) {
 			opType:       "TRANSFER",
 			amount:       20.0,
 			wantNewFunds: 100.0,
-			wantErr:      ErrInvalidOperation,
+			wantErr:      domain.ErrInvalidOperation,
 		},
 	}
 

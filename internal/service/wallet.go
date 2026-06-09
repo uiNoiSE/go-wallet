@@ -2,15 +2,9 @@ package service
 
 import (
 	"context"
-	"errors"
+	"go-wallet/internal/domain"
 
 	"github.com/google/uuid"
-)
-
-var (
-	ErrInsufficientFunds    = errors.New("insufficient funds")
-	ErrAmountMustBePositive = errors.New("amount must be greater than zero")
-	ErrInvalidOperation     = errors.New("invalid operation type")
 )
 
 type WalletRepository interface {
@@ -31,7 +25,7 @@ func NewWalletService(repo WalletRepository) *WalletService {
 
 func (s *WalletService) ProcessTransaction(ctx context.Context, id uuid.UUID, opType string, amount float64) error {
 	if amount <= 0 {
-		return ErrAmountMustBePositive
+		return domain.ErrAmountMustBePositive
 	}
 
 	currentBalance, err := s.repo.GetWalletBalance(ctx, id)
@@ -45,11 +39,11 @@ func (s *WalletService) ProcessTransaction(ctx context.Context, id uuid.UUID, op
 		newBalance = currentBalance + amount
 	case "WITHDRAW":
 		if currentBalance < amount {
-			return ErrInsufficientFunds
+			return domain.ErrInsufficientFunds
 		}
 		newBalance = currentBalance - amount
 	default:
-		return ErrInvalidOperation
+		return domain.ErrInvalidOperation
 	}
 
 	err = s.repo.UpdateWalletBalance(ctx, id, newBalance)

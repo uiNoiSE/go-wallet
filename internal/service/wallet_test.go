@@ -38,7 +38,7 @@ func TestProcessTransaction(t *testing.T) {
 	type testCase struct {
 		name         string
 		initialFunds float64
-		opType       string
+		opType       domain.OperationType
 		amount       float64
 		dbErr        error
 		wantNewFunds float64
@@ -49,7 +49,7 @@ func TestProcessTransaction(t *testing.T) {
 		{
 			name:         "Успешный депозит",
 			initialFunds: 100.0,
-			opType:       "DEPOSIT",
+			opType:       domain.OpDeposit,
 			amount:       50.0,
 			wantNewFunds: 150.0,
 			wantErr:      nil,
@@ -58,7 +58,7 @@ func TestProcessTransaction(t *testing.T) {
 		{
 			name:         "Успешное списание",
 			initialFunds: 100.0,
-			opType:       "WITHDRAW",
+			opType:       domain.OpWithdraw,
 			amount:       40.0,
 			wantNewFunds: 60.0,
 			wantErr:      nil,
@@ -67,7 +67,7 @@ func TestProcessTransaction(t *testing.T) {
 		{
 			name:         "Ошибка: Сумма транзакции меньше или равна нулю",
 			initialFunds: 100.0,
-			opType:       "DEPOSIT",
+			opType:       domain.OpDeposit,
 			amount:       -10.0,
 			wantNewFunds: 100.0,
 			wantErr:      domain.ErrAmountMustBePositive,
@@ -76,7 +76,7 @@ func TestProcessTransaction(t *testing.T) {
 		{
 			name:         "Ошибка: Недостаточно средств",
 			initialFunds: 50.0,
-			opType:       "WITHDRAW",
+			opType:       domain.OpWithdraw,
 			amount:       100.0,
 			wantNewFunds: 50.0,
 			wantErr:      domain.ErrInsufficientFunds,

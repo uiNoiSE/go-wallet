@@ -13,7 +13,7 @@ import (
 type WalletService interface {
 	CreateWallet(ctx context.Context) (uuid.UUID, error)
 	GetWalletBalance(ctx context.Context, id uuid.UUID) (float64, error)
-	ProcessTransaction(ctx context.Context, id uuid.UUID, opType string, amount float64) error
+	ProcessTransaction(ctx context.Context, id uuid.UUID, opType domain.OperationType, amount float64) error
 }
 
 type WalletHandler struct {
@@ -94,7 +94,13 @@ func (h *WalletHandler) ProcessTransaction(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err = h.service.ProcessTransaction(r.Context(), id, req.OperationType, req.Amount)
+	op := domain.OperationType(req.OperationType)
+	if !op.IsValid() {
+		http.Error(w, "Invalid operetion type (valid options is: WITHDRAW and DEPOSIT)", http.StatusBadRequest)
+		return
+	}
+
+	err = h.service.ProcessTransaction(r.Context(), id, op, req.Amount)
 	if err != nil {
 		h.handleServiceError(w, err)
 		return

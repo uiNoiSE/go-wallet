@@ -23,7 +23,7 @@ func NewWalletService(repo WalletRepository) *WalletService {
 	}
 }
 
-func (s *WalletService) ProcessTransaction(ctx context.Context, id uuid.UUID, opType string, amount float64) error {
+func (s *WalletService) ProcessTransaction(ctx context.Context, id uuid.UUID, opType domain.OperationType, amount float64) error {
 	if amount <= 0 {
 		return domain.ErrAmountMustBePositive
 	}
@@ -35,9 +35,9 @@ func (s *WalletService) ProcessTransaction(ctx context.Context, id uuid.UUID, op
 
 	var newBalance float64
 	switch opType {
-	case "DEPOSIT":
+	case domain.OpDeposit:
 		newBalance = currentBalance + amount
-	case "WITHDRAW":
+	case domain.OpWithdraw:
 		if currentBalance < amount {
 			return domain.ErrInsufficientFunds
 		}

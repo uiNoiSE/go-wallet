@@ -14,7 +14,7 @@ import (
 type mockWalletService struct {
 	onCreateWallet       func(ctx context.Context) (uuid.UUID, error)
 	onGetWalletBalance   func(ctx context.Context, id uuid.UUID) (float64, error)
-	onProcessTransaction func(ctx context.Context, id uuid.UUID, opType string, amount float64) error
+	onProcessTransaction func(ctx context.Context, id uuid.UUID, opType domain.OperationType, amount float64) error
 }
 
 func (m *mockWalletService) CreateWallet(ctx context.Context) (uuid.UUID, error) {
@@ -25,7 +25,7 @@ func (m *mockWalletService) GetWalletBalance(ctx context.Context, id uuid.UUID) 
 	return m.onGetWalletBalance(ctx, id)
 }
 
-func (m *mockWalletService) ProcessTransaction(ctx context.Context, id uuid.UUID, opType string, amount float64) error {
+func (m *mockWalletService) ProcessTransaction(ctx context.Context, id uuid.UUID, opType domain.OperationType, amount float64) error {
 	return m.onProcessTransaction(ctx, id, opType, amount)
 }
 
@@ -144,7 +144,7 @@ func TestProcessTransaction(t *testing.T) {
 			name:        "Транзакция прошла успешно",
 			requestBody: `{"id": "00000000-0000-0000-0000-000000000001", "opType": "DEPOSIT", "amount": 100.0}`,
 			mockBehavior: func(m *mockWalletService) {
-				m.onProcessTransaction = func(ctx context.Context, id uuid.UUID, opType string, amount float64) error {
+				m.onProcessTransaction = func(ctx context.Context, id uuid.UUID, opType domain.OperationType, amount float64) error {
 					return nil
 				}
 			},
@@ -155,7 +155,7 @@ func TestProcessTransaction(t *testing.T) {
 			name:        "Ошибка бизнес-логики (недостаточно средств)",
 			requestBody: `{"id": "00000000-0000-0000-0000-000000000001", "opType": "WITHDRAW", "amount": 999999.0}`,
 			mockBehavior: func(m *mockWalletService) {
-				m.onProcessTransaction = func(ctx context.Context, id uuid.UUID, opType string, amount float64) error {
+				m.onProcessTransaction = func(ctx context.Context, id uuid.UUID, opType domain.OperationType, amount float64) error {
 					return domain.ErrInsufficientFunds
 				}
 			},

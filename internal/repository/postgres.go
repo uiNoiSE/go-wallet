@@ -3,6 +3,8 @@ package repository
 import (
 	"context"
 	"fmt"
+	"go-wallet/internal/domain"
+	"go-wallet/internal/service"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -56,10 +58,8 @@ func (r *PostgresRepository) CreateWallet(ctx context.Context) (uuid.UUID, error
 	return newID, nil
 }
 
-func (r *PostgresRepository) GetWalletBalance(ctx context.Context, id uuid.UUID) (float64, error) {
+func (r *PostgresRepository) getBalanceByQuery(ctx context.Context, query string, id uuid.UUID) (float64, error) {
 	var balance float64
-
-	query := `SELECT balance FROM wallets WHERE id = $1`
 
 	err := r.db.QueryRow(ctx, query, id).Scan(&balance)
 	if err != nil {
@@ -67,6 +67,16 @@ func (r *PostgresRepository) GetWalletBalance(ctx context.Context, id uuid.UUID)
 	}
 
 	return balance, nil
+}
+
+func (r *PostgresRepository) GetWalletBalance(ctx context.Context, id uuid.UUID) (float64, error) {
+	q := `SELECT balance FROM wallets WHERE id = $1`
+	return r.getBalanceByQuery(ctx, q, id)
+}
+
+func (r *PostgresRepository) GetWalletForUpdate(ctx context.Context, id uuid.UUID) (float64, error) {
+	q := `SELECT balance FROM wallets WHERE id = $1 FOR UPDATE`
+	return r.getBalanceByQuery(ctx, q, id)
 }
 
 func (r *PostgresRepository) UpdateWalletBalance(ctx context.Context, id uuid.UUID, newBalance float64) error {
@@ -84,13 +94,18 @@ func (r *PostgresRepository) UpdateWalletBalance(ctx context.Context, id uuid.UU
 	return nil
 }
 
-func (r *PostgresRepository) WithTx(tx pgxQuerier) *PostgresRepository {
+func (r *PostgresRepository) WithTx(tx domain.Tx) service.WalletRepository {
+	pgxTx, ok := tx.(pgx.Tx)
+	if !ok {
+		panic("database/postgres: transaction is not a pgx.Tx")
+	}
+
 	return &PostgresRepository{
-		db: tx,
+		db: pgxTx,
 	}
 }
 
-func (r *PostgresRepository) BeginTx(ctx context.Context) (pgx.Tx, error) {
+func (r *PostgresRepository) BeginTx(ctx context.Context) (domain.Tx, error) {
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("Не удалось открыть транзакцию: %w", err)

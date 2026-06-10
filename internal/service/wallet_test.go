@@ -9,6 +9,8 @@ import (
 	"github.com/google/uuid"
 )
 
+type mockTx struct{}
+
 type mockRepo struct {
 	balance float64
 	dbErr   error
@@ -16,6 +18,10 @@ type mockRepo struct {
 
 func (m *mockRepo) CreateWallet(ctx context.Context) (uuid.UUID, error) {
 	return uuid.New(), nil
+}
+
+func (m *mockRepo) GetWalletForUpdate(ctx context.Context, id uuid.UUID) (float64, error) {
+	return m.GetWalletBalance(ctx, id)
 }
 
 func (m *mockRepo) GetWalletBalance(ctx context.Context, id uuid.UUID) (float64, error) {
@@ -32,6 +38,18 @@ func (m *mockRepo) UpdateWalletBalance(ctx context.Context, id uuid.UUID, newBal
 
 	m.balance = newBalance
 	return nil
+}
+
+func (m *mockTx) Commit(ctx context.Context) error { return nil }
+
+func (m *mockTx) Rollback(ctx context.Context) error { return nil }
+
+func (m *mockRepo) BeginTx(ctx context.Context) (domain.Tx, error) {
+	return &mockTx{}, nil
+}
+
+func (m *mockRepo) WithTx(tx domain.Tx) WalletRepository {
+	return m
 }
 
 func TestProcessTransaction(t *testing.T) {

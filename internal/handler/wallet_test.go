@@ -13,7 +13,7 @@ import (
 
 type mockWalletService struct {
 	onCreateWallet       func(ctx context.Context) (uuid.UUID, error)
-	onGetWalletBalance   func(ctx context.Context, id uuid.UUID) (float64, error)
+	onGetBalance         func(ctx context.Context, id uuid.UUID) (float64, error)
 	onProcessTransaction func(ctx context.Context, id uuid.UUID, opType domain.OperationType, amount float64) error
 }
 
@@ -21,8 +21,8 @@ func (m *mockWalletService) CreateWallet(ctx context.Context) (uuid.UUID, error)
 	return m.onCreateWallet(ctx)
 }
 
-func (m *mockWalletService) GetWalletBalance(ctx context.Context, id uuid.UUID) (float64, error) {
-	return m.onGetWalletBalance(ctx, id)
+func (m *mockWalletService) GetBalance(ctx context.Context, id uuid.UUID) (float64, error) {
+	return m.onGetBalance(ctx, id)
 }
 
 func (m *mockWalletService) ProcessTransaction(ctx context.Context, id uuid.UUID, opType domain.OperationType, amount float64) error {
@@ -74,7 +74,7 @@ func TestCreateWallet(t *testing.T) {
 	}
 }
 
-func TestGetWalletBalance(t *testing.T) {
+func TestGetBalance(t *testing.T) {
 	targetUUID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 
 	tests := []struct {
@@ -87,7 +87,7 @@ func TestGetWalletBalance(t *testing.T) {
 			name:         "Успешное получение баланса",
 			walletIDPath: targetUUID.String(),
 			mockBehavior: func(m *mockWalletService) {
-				m.onGetWalletBalance = func(ctx context.Context, id uuid.UUID) (float64, error) {
+				m.onGetBalance = func(ctx context.Context, id uuid.UUID) (float64, error) {
 					return 150.45, nil
 				}
 			},
@@ -98,7 +98,7 @@ func TestGetWalletBalance(t *testing.T) {
 			name:         "Кошелёк не найден в базе",
 			walletIDPath: targetUUID.String(),
 			mockBehavior: func(m *mockWalletService) {
-				m.onGetWalletBalance = func(ctx context.Context, id uuid.UUID) (float64, error) {
+				m.onGetBalance = func(ctx context.Context, id uuid.UUID) (float64, error) {
 					return 0, domain.ErrWalletNotFound
 				}
 			},
@@ -125,7 +125,7 @@ func TestGetWalletBalance(t *testing.T) {
 
 			rec := httptest.NewRecorder()
 
-			h.GetWalletBalance(rec, req)
+			h.GetBalance(rec, req)
 			if rec.Code != test.expectedStatus {
 				t.Errorf("Ожидался статус %d, получили %d", test.expectedStatus, rec.Code)
 			}

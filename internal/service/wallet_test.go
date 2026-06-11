@@ -9,8 +9,6 @@ import (
 	"github.com/google/uuid"
 )
 
-type mockTx struct{}
-
 type mockRepo struct {
 	balance float64
 	dbErr   error
@@ -20,36 +18,25 @@ func (m *mockRepo) CreateWallet(ctx context.Context) (uuid.UUID, error) {
 	return uuid.New(), nil
 }
 
-func (m *mockRepo) GetWalletForUpdate(ctx context.Context, id uuid.UUID) (float64, error) {
-	return m.GetWalletBalance(ctx, id)
-}
-
-func (m *mockRepo) GetWalletBalance(ctx context.Context, id uuid.UUID) (float64, error) {
+func (m *mockRepo) GetBalance(ctx context.Context, id uuid.UUID) (float64, error) {
 	if m.dbErr != nil {
 		return 0, m.dbErr
 	}
 	return m.balance, nil
 }
 
-func (m *mockRepo) UpdateWalletBalance(ctx context.Context, id uuid.UUID, newBalance float64) error {
+func (m *mockRepo) SaveTransaction(ctx context.Context, id uuid.UUID, opType domain.OperationType, amount float64) error {
 	if m.dbErr != nil {
 		return m.dbErr
 	}
 
-	m.balance = newBalance
+	if opType == domain.OpDeposit {
+		m.balance += amount
+	} else {
+		m.balance -= amount
+	}
+
 	return nil
-}
-
-func (m *mockTx) Commit(ctx context.Context) error { return nil }
-
-func (m *mockTx) Rollback(ctx context.Context) error { return nil }
-
-func (m *mockRepo) BeginTx(ctx context.Context) (domain.Tx, error) {
-	return &mockTx{}, nil
-}
-
-func (m *mockRepo) WithTx(tx domain.Tx) WalletRepository {
-	return m
 }
 
 func TestProcessTransaction(t *testing.T) {
@@ -115,9 +102,11 @@ func TestProcessTransaction(t *testing.T) {
 			fakeDB := &mockRepo{balance: tc.initialFunds, dbErr: tc.dbErr}
 			svc := NewWalletService(fakeDB)
 
-			err := svc.ProcessTransaction(context.Background(), uuid.New(), tc.opType, tc.amount)
+			walletID := uuid.New()
+			err := svc.ProcessTransaction(context.Background(), walletID, tc.opType, tc.amount)
 
 			if tc.wantErr != nil {
+
 				if err == nil {
 					t.Fatalf("Ожидали ошибку '%v', но метод выполнился успешно", tc.wantErr)
 				}
@@ -129,6 +118,10 @@ func TestProcessTransaction(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Не ожидали ошибку, но получили: %v", err)
 				}
+			}
+
+			if fakeDB.balance != tc.wantNewFunds {
+				t.Errorf("Ошибка баланса! Ожидали финальный баланс %.2f, но получили %.2f", tc.wantNewFunds, fakeDB.balance)
 			}
 		})
 	}

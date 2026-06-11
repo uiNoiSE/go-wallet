@@ -12,7 +12,7 @@ import (
 
 type WalletService interface {
 	CreateWallet(ctx context.Context) (uuid.UUID, error)
-	GetWalletBalance(ctx context.Context, id uuid.UUID) (float64, error)
+	GetBalance(ctx context.Context, id uuid.UUID) (float64, error)
 	ProcessTransaction(ctx context.Context, id uuid.UUID, opType domain.OperationType, amount float64) error
 }
 
@@ -45,7 +45,7 @@ func (h *WalletHandler) CreateWallet(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusCreated, response)
 }
 
-func (h *WalletHandler) GetWalletBalance(w http.ResponseWriter, r *http.Request) {
+func (h *WalletHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -58,7 +58,7 @@ func (h *WalletHandler) GetWalletBalance(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	balance, err := h.service.GetWalletBalance(r.Context(), id)
+	balance, err := h.service.GetBalance(r.Context(), id)
 	if err != nil {
 		http.Error(w, domain.ErrWalletNotFound.Error(), http.StatusNotFound)
 		return

@@ -10,11 +10,8 @@ import (
 
 type WalletRepository interface {
 	CreateWallet(ctx context.Context) (uuid.UUID, error)
-	GetWalletBalance(ctx context.Context, id uuid.UUID) (float64, error)
-	GetWalletForUpdate(ctx context.Context, id uuid.UUID) (float64, error)
-	UpdateWalletBalance(ctx context.Context, id uuid.UUID, newBalance float64) error
-	BeginTx(ctx context.Context) (domain.Tx, error)
-	WithTx(domain.Tx) WalletRepository
+	GetBalance(ctx context.Context, id uuid.UUID) (float64, error)
+	SaveTransaction(ctx context.Context, id uuid.UUID, opType domain.OperationType, amount float64) error
 }
 
 type WalletService struct {
@@ -22,59 +19,40 @@ type WalletService struct {
 }
 
 func NewWalletService(repo WalletRepository) *WalletService {
-	return &WalletService{
-		repo: repo,
-	}
-}
-
-func (s *WalletService) ProcessTransaction(ctx context.Context, id uuid.UUID, opType domain.OperationType, amount float64) error {
-	if amount <= 0 {
-		return domain.ErrAmountMustBePositive
-	}
-
-	tx, err := s.repo.BeginTx(ctx)
-	if err != nil {
-		return fmt.Errorf("service: не удалось начать транзакцию: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	txRepo := s.repo.WithTx(tx)
-
-	currentBalance, err := txRepo.GetWalletBalance(ctx, id)
-	if err != nil {
-		return err
-	}
-
-	var newBalance float64
-	switch opType {
-	case domain.OpDeposit:
-		newBalance = currentBalance + amount
-	case domain.OpWithdraw:
-		if currentBalance < amount {
-			return domain.ErrInsufficientFunds
-		}
-		newBalance = currentBalance - amount
-	default:
-		return domain.ErrInvalidOperation
-	}
-
-	err = txRepo.UpdateWalletBalance(ctx, id, newBalance)
-	if err != nil {
-		return err
-	}
-
-	err = tx.Commit(ctx)
-	if err != nil {
-		return fmt.Errorf("service: не удалось закоммитить транзакцию: %w", err)
-	}
-
-	return nil
+	return &WalletService{repo: repo}
 }
 
 func (s *WalletService) CreateWallet(ctx context.Context) (uuid.UUID, error) {
 	return s.repo.CreateWallet(ctx)
 }
 
-func (s *WalletService) GetWalletBalance(ctx context.Context, id uuid.UUID) (float64, error) {
-	return s.repo.GetWalletBalance(ctx, id)
+func (s *WalletService) GetBalance(ctx context.Context, id uuid.UUID) (float64, error) {
+	return s.repo.GetBalance(ctx, id)
+}
+
+func (s *WalletService) ProcessTransaction(ctx context.Context, id uuid.UUID, opType domain.OperationType, amount float64) error {
+	if opType != domain.OpDeposit && opType != domain.OpWithdraw {
+		return domain.ErrInvalidOperation
+	}
+
+	if amount <= 0 {
+		return domain.ErrAmountMustBePositive
+	}
+
+	if opType == domain.OpWithdraw {
+		currentBalance, err := s.repo.GetBalance(ctx, id)
+		if err != nil {
+			return fmt.Errorf("ошибка при проверке баланса: %w", err)
+		}
+		if currentBalance < amount {
+			return domain.ErrInsufficientFunds
+		}
+	}
+
+	err := s.repo.SaveTransaction(ctx, id, opType, amount)
+	if err != nil {
+		return fmt.Errorf("ошибка при сохранении операции: %w", err)
+	}
+
+	return nil
 }

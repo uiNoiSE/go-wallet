@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"go-wallet/internal/domain"
-	"go-wallet/internal/service"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -47,68 +46,53 @@ func NewPostgresRepository(pool *pgxpool.Pool) *PostgresRepository {
 
 func (r *PostgresRepository) CreateWallet(ctx context.Context) (uuid.UUID, error) {
 	newID := uuid.New()
+	query := `INSERT INTO wallet_transactions (wallet_id, operation_type, amount) VALUES ($1, 'CREATE', 0.0)`
 
-	query := `INSERT INTO wallets (id, balance) VALUES ($1, $2)`
-
-	_, err := r.db.Exec(ctx, query, newID, 0.00)
+	_, err := r.db.Exec(ctx, query, newID)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("Ошибка при вставке кошелька в БД: %w", err)
+		return uuid.Nil, fmt.Errorf("Ошибка регистрации кошелька: %w", err)
 	}
 
 	return newID, nil
 }
 
-func (r *PostgresRepository) getBalanceByQuery(ctx context.Context, query string, id uuid.UUID) (float64, error) {
-	var balance float64
-
-	err := r.db.QueryRow(ctx, query, id).Scan(&balance)
+func (r *PostgresRepository) GetBalance(ctx context.Context, id uuid.UUID) (float64, error) {
+	var exists bool
+	checkQuery := `SELECT EXISTS(SELECT 1 FROM wallet_transactions WHERE wallet_id = $1)`
+	err := r.db.QueryRow(ctx, checkQuery, id).Scan(&exists)
 	if err != nil {
-		return 0.0, fmt.Errorf("Ошибка при получении баланса кошелька: %w", err)
+		return 0.0, fmt.Errorf("Ошибка проверки существования кошелька: %w", err)
+	}
+	if !exists {
+		return 0.0, fmt.Errorf("Кошелёк с id %s не найден", id)
+	}
+
+	query := `
+	SELECT COALESCE(
+		SUM(CASE WHEN operation_type = 'DEPOSIT' THEN amount ELSE -amount END),
+		0.0
+	)
+	FROM wallet_transactions
+	WHERE wallet_id = $1`
+
+	var balance float64
+	err = r.db.QueryRow(ctx, query, id).Scan(&balance)
+	if err != nil {
+		return 0.0, fmt.Errorf("Ошибка при подсчете баланса кошелька: %w", err)
 	}
 
 	return balance, nil
 }
 
-func (r *PostgresRepository) GetWalletBalance(ctx context.Context, id uuid.UUID) (float64, error) {
-	q := `SELECT balance FROM wallets WHERE id = $1`
-	return r.getBalanceByQuery(ctx, q, id)
-}
+func (r *PostgresRepository) SaveTransaction(ctx context.Context, id uuid.UUID, opType domain.OperationType, amount float64) error {
+	query := `
+	INSERT INTO wallet_transactions (wallet_id, operation_type, amount)
+	VALUES ($1, $2, $3)`
 
-func (r *PostgresRepository) GetWalletForUpdate(ctx context.Context, id uuid.UUID) (float64, error) {
-	q := `SELECT balance FROM wallets WHERE id = $1 FOR UPDATE`
-	return r.getBalanceByQuery(ctx, q, id)
-}
-
-func (r *PostgresRepository) UpdateWalletBalance(ctx context.Context, id uuid.UUID, newBalance float64) error {
-	query := `UPDATE wallets SET balance = $1 WHERE id = $2`
-
-	result, err := r.db.Exec(ctx, query, newBalance, id)
+	_, err := r.db.Exec(ctx, query, id, opType, amount)
 	if err != nil {
-		return fmt.Errorf("Ошибка при обновлении баланса в БД: %w", err)
-	}
-
-	if result.RowsAffected() == 0 {
-		return fmt.Errorf("Кошелёк с id: %s не найден", id)
+		return fmt.Errorf("Ошибка при сохранении транзакции в БД: %w", err)
 	}
 
 	return nil
-}
-
-func (r *PostgresRepository) WithTx(tx domain.Tx) service.WalletRepository {
-	pgxTx, ok := tx.(pgx.Tx)
-	if !ok {
-		panic("database/postgres: transaction is not a pgx.Tx")
-	}
-
-	return &PostgresRepository{
-		db: pgxTx,
-	}
-}
-
-func (r *PostgresRepository) BeginTx(ctx context.Context) (domain.Tx, error) {
-	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("Не удалось открыть транзакцию: %w", err)
-	}
-	return tx, nil
 }

@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -14,8 +13,17 @@ type Config struct {
 }
 
 func LoadConfig() *Config {
-	if err := godotenv.Load("config.env"); err != nil {
-		log.Println("WARN: config.env файл не найден, читаем переменные из окружения")
+	paths := []string{
+		"config.env",
+		"../config.env",
+		"../../config.env",
+		"../../../config.env",
+	}
+
+	for _, path := range paths {
+		if err := godotenv.Load(path); err == nil {
+			break
+		}
 	}
 
 	port := os.Getenv("SERVER_PORT")
@@ -24,7 +32,7 @@ func LoadConfig() *Config {
 	}
 
 	// postgres://user:password@host:port/db_name?sslmode=sslmode
-	dbURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
+	dbURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s&pool_max_conns=40",
 		os.Getenv("POSTGRES_USER"),
 		os.Getenv("POSTGRES_PASSWORD"),
 		os.Getenv("DB_HOST"),
